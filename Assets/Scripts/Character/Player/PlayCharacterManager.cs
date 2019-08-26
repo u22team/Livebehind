@@ -11,29 +11,33 @@ public class PlayCharacterManager : MonoBehaviour
         public Vector3 colliderHalfScale; //ホントはこれget専用にしなきゃだめ
         public float hitDistance;
         public RaycastHit rayCastHit;
+        public int colliderHalfScaleInt;
+        public int distanceInt;
+        public int layerMask;
     }
 
-    private static Dictionary<Vector3Int, touchGroup> touchDic;
+    private Dictionary<Vector3Int, touchGroup> touchDic;
     private Rigidbody playCharRB;
-    Quaternion thisRotation = Quaternion.identity;
     private Vector3Int moveDirection; //vector2の方がいい気がする
     int nextTurnDirection; //右折が1、左折が-1 名前変えたほうがいいかも
     int canJumpNum;
     bool isJump;
     bool isMoving;
-    Vector3Int transformPosInt, velocityUpwards;
+    public Vector3Int transformPosInt, velocityUpwards;
     Vector3Int Vector3IntForward = new Vector3Int(0, 0, 1), Vector3IntBack = new Vector3Int(0, 0, -1);
+    [SerializeField]
+    GameObject playCharModel;
 
     private void Start()
     {
         touchDic = new Dictionary<Vector3Int, touchGroup>
         {
-            { Vector3Int.down, new touchGroup { touch=false, collision=false, colliderHalfScale=new Vector3(0.0495f,0,0.0495f), hitDistance=0.1001f } }, //こいつ以外すり抜け床を判定しない
-            { Vector3Int.up, new touchGroup { touch=false, collision=false, colliderHalfScale=new Vector3(0.0495f,0,0.0495f), hitDistance=0.1001f } },
-            { Vector3Int.right, new touchGroup { touch=false, collision=false, colliderHalfScale=new Vector3(0,0.0995f,0.0495f), hitDistance=0.0501f } },
-            { Vector3Int.left, new touchGroup { touch=false, collision=false, colliderHalfScale=new Vector3(0,0.0995f,0.0495f), hitDistance=0.0501f } },
-            { Vector3IntForward, new touchGroup { touch=false, collision=false, colliderHalfScale=new Vector3(0.0495f,0.0995f,0), hitDistance=0.0501f } },
-            { Vector3IntBack, new touchGroup { touch=true, collision=false, colliderHalfScale=new Vector3(0.0495f,0.0995f,0), hitDistance=0.0501f } }
+            { Vector3Int.down, new touchGroup { touch=false, collision=false, colliderHalfScale=new Vector3(0.0495f,0,0.0495f), hitDistance=0.1001f, colliderHalfScaleInt=128, layerMask=~(1<<LayerMask.NameToLayer("Damager")) } },
+            { Vector3Int.up, new touchGroup { touch=false, collision=false, colliderHalfScale=new Vector3(0.0495f,0,0.0495f), hitDistance=0.1001f, colliderHalfScaleInt=128, layerMask=~(1<<LayerMask.NameToLayer("Damager") | 1<<LayerMask.NameToLayer("ThroughFloor")) } },
+            { Vector3Int.right, new touchGroup { touch=false, collision=false, colliderHalfScale=new Vector3(0,0.0995f,0.0495f), hitDistance=0.0501f, colliderHalfScaleInt=64, layerMask=~(1<<LayerMask.NameToLayer("Damager") | 1<<LayerMask.NameToLayer("ThroughFloor")) } },
+            { Vector3Int.left, new touchGroup { touch=false, collision=false, colliderHalfScale=new Vector3(0,0.0995f,0.0495f), hitDistance=0.0501f, colliderHalfScaleInt=64, layerMask=~(1<<LayerMask.NameToLayer("Damager") | 1<<LayerMask.NameToLayer("ThroughFloor")) } },
+            { Vector3IntForward, new touchGroup { touch=false, collision=false, colliderHalfScale=new Vector3(0.0495f,0.0995f,0), hitDistance=0.0501f, colliderHalfScaleInt=64, layerMask=~(1<<LayerMask.NameToLayer("Damager") | 1<<LayerMask.NameToLayer("ThroughFloor")) } },
+            { Vector3IntBack, new touchGroup { touch=true, collision=false, colliderHalfScale=new Vector3(0.0495f,0.0995f,0), hitDistance=0.0501f, colliderHalfScaleInt=64, layerMask=~(1<<LayerMask.NameToLayer("Damager") | 1<<LayerMask.NameToLayer("ThroughFloor")) } }
         };
 
         playCharRB = this.GetComponent<Rigidbody>();
@@ -47,7 +51,7 @@ public class PlayCharacterManager : MonoBehaviour
         isMoving = true; //falseにしとけ
     }
 
-    private void FixedUpdate()
+    private void FixedUpdate() //ジャンプや移動等の動作を司る部分と、オートランを司る部分を分離すること
     {
         Vector3 thisPosition = this.transform.position;
 
@@ -55,12 +59,28 @@ public class PlayCharacterManager : MonoBehaviour
 
         foreach (KeyValuePair<Vector3Int, touchGroup> pair in touchDic)
         {
-            if (!Physics.BoxCast(thisPosition, touchDic[pair.Key].colliderHalfScale, pair.Key, out touchDic[pair.Key].rayCastHit, thisRotation))
+            if (pair.Key==Vector3Int.down)
             {
-                touchDic[pair.Key].rayCastHit.distance = 2147483647; //ヒットしなかった場合に代入する最大値
+                RaycastHit _rayCastHit, _rayCastHit2;
+                if (Physics.BoxCast(thisPosition, touchDic[pair.Key].colliderHalfScale, pair.Key, out _rayCastHit, Quaternion.identity, Mathf.Infinity, ~(1 << LayerMask.NameToLayer("Damager")))
+                    && Physics.BoxCast(thisPosition, touchDic[pair.Key].colliderHalfScale, pair.Key, out _rayCastHit2, Quaternion.identity, Mathf.Infinity, ~(1 << LayerMask.NameToLayer("Damager") | 1 << LayerMask.NameToLayer("ThroughFloor"))))
+                {
+                    touchDic[pair.Key].rayCastHit.distance = (_rayCastHit.distance >= 0.0999f && _rayCastHit.distance < _rayCastHit2.distance && velocityUpwards.y <= 0) ? _rayCastHit.distance : _rayCastHit2.distance;
+                }
+                else
+                {
+                    touchDic[pair.Key].rayCastHit.distance = Mathf.Infinity; //ヒットしなかった場合に代入する最大値
+                }
+            }
+            else
+            {
+                if (!Physics.BoxCast(thisPosition, touchDic[pair.Key].colliderHalfScale, pair.Key, out touchDic[pair.Key].rayCastHit, Quaternion.identity, Mathf.Infinity, touchDic[pair.Key].layerMask))
+                {
+                    touchDic[pair.Key].rayCastHit.distance = Mathf.Infinity; //ヒットしなかった場合に代入する最大値
+                }
             }
 
-            if (touchDic[pair.Key].rayCastHit.distance <= touchDic[pair.Key].hitDistance)
+            if (touchDic[pair.Key].hitDistance - 0.0002f <= touchDic[pair.Key].rayCastHit.distance && touchDic[pair.Key].rayCastHit.distance <= touchDic[pair.Key].hitDistance)
             {
                 if (touchDic[pair.Key].touch == false) touchDic[pair.Key].collision = true;
                 touchDic[pair.Key].touch = true;
@@ -70,6 +90,8 @@ public class PlayCharacterManager : MonoBehaviour
                 touchDic[pair.Key].touch = false;
                 touchDic[pair.Key].collision = false;
             }
+
+            touchDic[pair.Key].distanceInt = Mathf.RoundToInt(touchDic[pair.Key].rayCastHit.distance * 1280) - touchDic[pair.Key].colliderHalfScaleInt;
         }
 
         /* moveDirectionの決定 */
@@ -88,7 +110,7 @@ public class PlayCharacterManager : MonoBehaviour
                 case 1: //左壁1、右壁0、接地0
                 case 2: //左壁0、右壁2、接地0
                 case 3:
-                    if (moveDirection == Vector3Int.right || moveDirection == Vector3Int.left) moveDirection = reverseDirection;
+                    if (moveDirection == Vector3Int.right || moveDirection == Vector3Int.left) moveDirection = reverseDirection; //正しくないな
                     break; //左壁1、右壁2、接地0
                 case 4: moveDirection = moveDirection.Turn(nextTurnDirection); nextTurnDirection *= -1; break; //左壁0、右壁0、接地4
                 case 5: moveDirection = rightDirection; nextTurnDirection = -1; break; //左壁1、右壁0、接地4
@@ -135,17 +157,18 @@ public class PlayCharacterManager : MonoBehaviour
         }
         else if (touchDic[Vector3Int.up].collision)
         {
-            velocityUpwards *= -1;
+            velocityUpwards = Vector3Int.zero;
         }
-
-        int downwardDistanceInt = Mathf.RoundToInt(touchDic[Vector3Int.down].rayCastHit.distance * 1280) - 128;
-        int upwardDistanceInt = Mathf.RoundToInt(touchDic[Vector3Int.up].rayCastHit.distance * 1280) - 128;
 
         //重力
         if ((touchDic[Vector3Int.right].touch || touchDic[Vector3Int.left].touch) && !touchDic[Vector3Int.down].touch)
         {
             velocityUpwards = ((Vector3)velocityUpwards * 3 / 4).RoundToInt() + Vector3Int.down * 4;
             isMoving = false;
+
+            //暫定的にここに置かせてもらう 壁ズサ中の進行方向は優先度が高い
+            if ((touchDic[Vector3Int.right].touch && !touchDic[Vector3Int.left].touch)) moveDirection = Vector3Int.left;
+            else if ((!touchDic[Vector3Int.right].touch && touchDic[Vector3Int.left].touch)) moveDirection = Vector3Int.right;
         }
         else
         {
@@ -155,7 +178,6 @@ public class PlayCharacterManager : MonoBehaviour
         //ジャンプ
         if (isJump && !touchDic[Vector3Int.up].touch && !touchDic[moveDirection].touch)
         {
-            Debug.Log("ここ来てる？");
             if (touchDic[Vector3Int.down].touch) //地面からのジャンプ
             {
                 velocityUpwards = Vector3Int.up * 68;
@@ -164,9 +186,10 @@ public class PlayCharacterManager : MonoBehaviour
             else if (touchDic[reverseDirection].touch) //壁ジャン
             {
                 velocityUpwards = Vector3Int.up * 68;
-                transformPosInt += moveDirection * 16;
+                transformPosInt += moveDirection * 20;
                 canJumpNum = 1;
-            }else if (canJumpNum>0&& !touchDic[Vector3Int.down].touch) //空中ジャンプ
+            }
+            else if (canJumpNum > 0 && !touchDic[Vector3Int.down].touch) //空中ジャンプ
             {
                 velocityUpwards = Vector3Int.up * 68;
                 canJumpNum--;
@@ -176,27 +199,39 @@ public class PlayCharacterManager : MonoBehaviour
         }
 
         //上下方向のめり込み防止
-        if (-downwardDistanceInt > velocityUpwards.y)
+        if (-touchDic[Vector3Int.down].distanceInt > velocityUpwards.y)
         {
-            transformPosInt += Vector3Int.down * downwardDistanceInt;
+            transformPosInt += Vector3Int.down * touchDic[Vector3Int.down].distanceInt;
         }
-        else if (velocityUpwards.y > upwardDistanceInt)
+        else if (velocityUpwards.y > touchDic[Vector3Int.up].distanceInt)
         {
-            transformPosInt += Vector3Int.up * upwardDistanceInt;
+            transformPosInt += Vector3Int.up * touchDic[Vector3Int.up].distanceInt;
         }
         else
         {
             transformPosInt += velocityUpwards;
         }
 
-        //横移動
+        //水平移動 めり込み防止
         if (isMoving && touchDic[moveDirection].touch == false && (touchDic[Vector3Int.down].touch || (!touchDic[Vector3Int.down].touch && !touchDic[Vector3Int.right].touch && !touchDic[Vector3Int.left].touch)))
         {
-            transformPosInt += moveDirection * 16; //壁にめり込む可能性があるので要注意
+            if (20 < touchDic[moveDirection].distanceInt)
+            {
+                transformPosInt += moveDirection * 20;
+            }
+            else
+            {
+                transformPosInt += moveDirection * touchDic[moveDirection].distanceInt;
+            }
         }
 
         playCharRB.MovePosition((Vector3)transformPosInt / 1280); //スローを導入するなら1280では小さい
 
+        playCharModel.transform.rotation = Quaternion.Euler(0, 90 * (moveDirection.z > 0 ? -1 : 1) * (1 - moveDirection.x), 0);
+        playCharModel.transform.localScale = new Vector3((moveDirection.x == 0 ? 0.5f : 1), 1, (moveDirection.z == 0 ? 0.5f : 1));
+
+        //斜め進入時にめり込む問題を解決しろ 進行方向にレイを飛ばせ
+        Debug.Log(velocityUpwards);
         Debug.Log(transformPosInt);
     }
 
@@ -204,7 +239,7 @@ public class PlayCharacterManager : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            if (!touchDic[Vector3Int.up].touch && moveDirection != Vector3IntForward && moveDirection != Vector3IntBack) //前後移動中のジャンプはバッファしたほうがいいのかな ここの条件を外せばバッファになる
+            if (!touchDic[Vector3Int.up].touch && moveDirection != Vector3IntForward && moveDirection != Vector3IntBack) //やっぱり前後移動中のジャンプは１回分バッファしたほうがいいのかな ここの条件を外せばバッファになる
             {
                 isJump = true;
             }
@@ -214,28 +249,17 @@ public class PlayCharacterManager : MonoBehaviour
     /*
     [SerializeField]
     bool isEnable = false;
-    void OnDrawGizmos()
-    {
-        if (isEnable == false)
-            return;
 
-        foreach (KeyValuePair<Vector3Int, touchGroup> pair in touchDic)
+    private void OnDrawGizmos()
+    {
+        if (isEnable)
         {
-            Gizmos.DrawRay(transform.position, (Vector3)pair.Key * touchDic[pair.Key].rayCastHit.distance); //厚さ0で0.075以下
-            Gizmos.DrawWireCube(transform.position + (Vector3)pair.Key * touchDic[pair.Key].rayCastHit.distance, touchDic[pair.Key].colliderHalfScale * 2);
+            foreach (KeyValuePair<Vector3Int, touchGroup> pair in touchDic)
+            {
+                Gizmos.DrawRay(transform.position, (Vector3)pair.Key * touchDic[pair.Key].rayCastHit.distance); //厚さ0で0.075以下
+                Gizmos.DrawWireCube(transform.position + (Vector3)pair.Key * touchDic[pair.Key].rayCastHit.distance, touchDic[pair.Key].colliderHalfScale * 2);
+            }
         }
-    }
-    */
-
-    /*
-    Vector3 Parallelized(Vector3 rbv, Vector3Int md)
-    {
-        return new Vector3(rbv.x * md.x.Abs(), rbv.y * md.y.Abs(), rbv.z * md.z.Abs());
-    }
-
-    Vector3Int ParallelizedInt(Vector3Int rbv, Vector3Int md)
-    {
-        return new Vector3Int(rbv.x * md.x.Abs(), rbv.y * md.y.Abs(), rbv.z * md.z.Abs());
     }
     */
 }
