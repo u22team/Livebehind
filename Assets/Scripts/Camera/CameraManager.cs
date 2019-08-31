@@ -28,17 +28,6 @@ public class CameraManager : MonoBehaviour
         smooth = Enumerable.Repeat<float>(0, smoothFrame).ToArray();
     }
 
-    private void Update()
-    {
-        /*
-        if (PlayCharacter == null)
-        {
-            GameManager gameManager = new GameManager(); //そうか、同じクラスが複数のゲームオブジェクトにアタッチされている可能性もあるからダメなんか
-            PlayCharacter = 
-                }
-        */
-    }
-
     private void LateUpdate()
     {
         playCharPos = PlayCharacter.transform.position;
@@ -63,7 +52,7 @@ public class CameraManager : MonoBehaviour
         cam.transform.position = new Vector3(camPosX, Mathf.SmoothDamp(cam.transform.position.y, destination, ref m_velocity, m_dampTime), -0.8f);
 
         //cam.transform.position = new Vector3(camPosX, camPosY + defaultCamPosY, -0.8f);
-        cam.lensShift = new Vector2(-camPosX / 1.2f, 0);
+        cam.lensShift = new Vector2(-camPosX / 1.2f, -0.1f);
     }
 
 

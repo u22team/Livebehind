@@ -62,8 +62,8 @@ public class PlayCharacterManager : MonoBehaviour
             if (pair.Key==Vector3Int.down)
             {
                 RaycastHit _rayCastHit, _rayCastHit2;
-                if (Physics.BoxCast(thisPosition, touchDic[pair.Key].colliderHalfScale, pair.Key, out _rayCastHit, Quaternion.identity, Mathf.Infinity, ~(1 << LayerMask.NameToLayer("Damager")))
-                    && Physics.BoxCast(thisPosition, touchDic[pair.Key].colliderHalfScale, pair.Key, out _rayCastHit2, Quaternion.identity, Mathf.Infinity, ~(1 << LayerMask.NameToLayer("Damager") | 1 << LayerMask.NameToLayer("ThroughFloor"))))
+                if (Physics.BoxCast(thisPosition, touchDic[pair.Key].colliderHalfScale, pair.Key, out _rayCastHit, Quaternion.identity, Mathf.Infinity, ~(1 << LayerMask.NameToLayer("Damager") | 1 << LayerMask.NameToLayer("Ignore Raycast")))
+                    && Physics.BoxCast(thisPosition, touchDic[pair.Key].colliderHalfScale, pair.Key, out _rayCastHit2, Quaternion.identity, Mathf.Infinity, ~(1 << LayerMask.NameToLayer("Damager") | 1 << LayerMask.NameToLayer("ThroughFloor") | 1 << LayerMask.NameToLayer("Ignore Raycast"))))
                 {
                     touchDic[pair.Key].rayCastHit.distance = (_rayCastHit.distance >= 0.0999f && _rayCastHit.distance < _rayCastHit2.distance && velocityUpwards.y <= 0) ? _rayCastHit.distance : _rayCastHit2.distance;
                 }
@@ -74,7 +74,7 @@ public class PlayCharacterManager : MonoBehaviour
             }
             else
             {
-                if (!Physics.BoxCast(thisPosition, touchDic[pair.Key].colliderHalfScale, pair.Key, out touchDic[pair.Key].rayCastHit, Quaternion.identity, Mathf.Infinity, touchDic[pair.Key].layerMask))
+                if (!Physics.BoxCast(thisPosition, touchDic[pair.Key].colliderHalfScale, pair.Key, out touchDic[pair.Key].rayCastHit, Quaternion.identity, Mathf.Infinity, ~(1 << LayerMask.NameToLayer("Damager") | 1 << LayerMask.NameToLayer("ThroughFloor") | 1 << LayerMask.NameToLayer("Ignore Raycast"))))
                 {
                     touchDic[pair.Key].rayCastHit.distance = Mathf.Infinity; //ヒットしなかった場合に代入する最大値
                 }
@@ -163,6 +163,7 @@ public class PlayCharacterManager : MonoBehaviour
         //重力
         if ((touchDic[Vector3Int.right].touch || touchDic[Vector3Int.left].touch) && !touchDic[Vector3Int.down].touch)
         {
+            canJumpNum = 2;
             velocityUpwards = ((Vector3)velocityUpwards * 3 / 4).RoundToInt() + Vector3Int.down * 4;
             isMoving = false;
 
@@ -231,8 +232,6 @@ public class PlayCharacterManager : MonoBehaviour
         playCharModel.transform.localScale = new Vector3((moveDirection.x == 0 ? 0.5f : 1), 1, (moveDirection.z == 0 ? 0.5f : 1));
 
         //斜め進入時にめり込む問題を解決しろ 進行方向にレイを飛ばせ
-        Debug.Log(velocityUpwards);
-        Debug.Log(transformPosInt);
     }
 
     private void Update()
