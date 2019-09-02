@@ -28,6 +28,11 @@ public class PlayCharacterManager : MonoBehaviour
     [SerializeField]
     GameObject playCharModel;
 
+    [SerializeField] AudioClip seJump;
+    AudioSource audioSource;
+
+    [SerializeField] Camera cam;
+
     private void Start()
     {
         touchDic = new Dictionary<Vector3Int, touchGroup>
@@ -49,6 +54,8 @@ public class PlayCharacterManager : MonoBehaviour
         isJump = false;
         canJumpNum = 0;
         isMoving = true; //falseにしとけ
+
+        audioSource = cam.gameObject.GetComponent<AudioSource>();
     }
 
     private void FixedUpdate() //ジャンプや移動等の動作を司る部分と、オートランを司る部分を分離すること
@@ -179,6 +186,7 @@ public class PlayCharacterManager : MonoBehaviour
         //ジャンプ
         if (isJump && !touchDic[Vector3Int.up].touch && !touchDic[moveDirection].touch)
         {
+            audioSource.PlayOneShot(seJump);
             if (touchDic[Vector3Int.down].touch) //地面からのジャンプ
             {
                 velocityUpwards = Vector3Int.up * 68;
@@ -243,8 +251,25 @@ public class PlayCharacterManager : MonoBehaviour
                 isJump = true;
             }
         }
+
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.phase == TouchPhase.Began)
+            {
+                if (!touchDic[Vector3Int.up].touch && moveDirection != Vector3IntForward && moveDirection != Vector3IntBack) //やっぱり前後移動中のジャンプは１回分バッファしたほうがいいのかな ここの条件を外せばバッファになる
+                {
+                    isJump = true;
+                }
+            }
+        }
     }
 
+    public void ResetPlayerPosition()
+    {
+        transformPosInt = new Vector3Int(0, 192, 64);
+        velocityUpwards = Vector3Int.zero;
+    }
     /*
     [SerializeField]
     bool isEnable = false;
